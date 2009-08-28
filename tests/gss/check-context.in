@@ -407,7 +407,7 @@ for mech in krb5 krb5iov spnego spnegoiov; do
 done
 
 echo "======dce-style"
-for mech in krb5 krb5iov spnego; do
+for mech in krb5 krb5iov spnego spnegoiov; do
 	iov=""
 	if [ "$mech" = "krb5iov" ] ; then
 	    mech="krb5"
