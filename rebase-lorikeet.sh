@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Usage copy import-lorikeet.sh and rebase-lorikeet.sh
 # into an empty directory maybe call it update-heimdal
