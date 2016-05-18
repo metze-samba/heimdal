@@ -1682,10 +1682,19 @@ static krb5_error_code
 generate_pac(astgs_request_t r, Key *skey)
 {
     krb5_error_code ret;
+    const krb5_keyblock *pk_reply_key = NULL;
     krb5_pac p = NULL;
     krb5_data data;
 
-    ret = _kdc_pac_generate(r->context, r->client, &p);
+    switch (r->validated_pa_type) {
+    case KRB5_PADATA_PK_AS_REQ:
+    case KRB5_PADATA_PK_AS_REQ_WIN:
+	pk_reply_key = &r->reply_key;
+	break;
+    }
+
+    ret = _kdc_pac_generate(r->context, r->client,
+			    pk_reply_key, &p);
     if (ret) {
 	_kdc_r_log(r, 4, "PAC generation failed for -- %s",
 		   r->cname);
@@ -1992,6 +2001,7 @@ _kdc_as_rep(astgs_request_t r)
 			pat[n].name, r->cname);
 		found_pa = 1;
 		r->et.flags.pre_authent = 1;
+		r->validated_pa_type = pat[n].type;
 	    }
 	}
     }

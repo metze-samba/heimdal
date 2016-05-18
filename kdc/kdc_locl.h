@@ -78,6 +78,7 @@ struct astgs_request_desc {
     EncKDCRepPart ek;
 
     /* PA methods can affect both the reply key and the session key (pkinit) */
+    int validated_pa_type;
     krb5_enctype sessionetype;
     krb5_keyblock reply_key;
     krb5_keyblock session_key;
