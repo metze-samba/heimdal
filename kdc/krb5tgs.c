@@ -2253,7 +2253,8 @@ server_lookup:
 	    if(rspac.data) {
 		krb5_pac p = NULL;
 		krb5_data_free(&rspac);
-		ret = _kdc_pac_generate(context, s4u2self_impersonated_client, &p);
+		ret = _kdc_pac_generate(context, s4u2self_impersonated_client,
+					NULL, &p);
 		if (ret) {
                     _kdc_audit_addreason((kdc_request_t)priv,
                                          "KRB5SignedPath missing");
