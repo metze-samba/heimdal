@@ -71,6 +71,7 @@ krb5_kdc_windc_init(krb5_context context)
 
 struct generate_uc {
     hdb_entry_ex *client;
+    const krb5_keyblock *pk_reply_key;
     krb5_pac *pac;
 };
 
@@ -82,6 +83,12 @@ generate(krb5_context context, const void *plug, void *plugctx, void *userctx)
 
     if (ft->pac_generate == NULL)
 	return KRB5_PLUGIN_NO_HANDLE;
+
+    if (ft->pac_pk_generate != NULL && uc->pk_reply_key != NULL) {
+	return ft->pac_pk_generate((void *)plug, context,
+				   uc->client, uc->pk_reply_key, uc->pac);
+    }
+
     return ft->pac_generate((void *)plug, context, uc->client, uc->pac);
 }
 
@@ -89,6 +96,7 @@ generate(krb5_context context, const void *plug, void *plugctx, void *userctx)
 krb5_error_code
 _kdc_pac_generate(krb5_context context,
 		  hdb_entry_ex *client,
+		  const krb5_keyblock *pk_reply_key,
 		  krb5_pac *pac)
 {
     struct generate_uc uc;
@@ -97,6 +105,7 @@ _kdc_pac_generate(krb5_context context,
 	return 0;
 
     uc.client = client;
+    uc.pk_reply_key = pk_reply_key;
     uc.pac = pac;
 
     (void)_krb5_plugin_run_f(context, &windc_plugin_data,

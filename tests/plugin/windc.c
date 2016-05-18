@@ -41,6 +41,31 @@ pac_generate(void *ctx, krb5_context context,
 }
 
 static krb5_error_code
+pac_pk_generate(void *ctx, krb5_context context,
+		struct hdb_entry_ex *client,
+		const krb5_keyblock *pk_replykey,
+		krb5_pac *pac)
+{
+    krb5_error_code ret;
+    krb5_data data;
+
+    krb5_warnx(context, "pac pk generate");
+
+    data.data = "\x00\x01";
+    data.length = 2;
+
+    ret = krb5_pac_init(context, pac);
+    if (ret)
+	return ret;
+
+    ret = krb5_pac_add_buffer(context, *pac, 1, &data);
+    if (ret)
+	return ret;
+
+    return 0;
+}
+
+static krb5_error_code
 pac_verify(void *ctx, krb5_context context,
 	   const krb5_principal new_ticket_client,
 	   const krb5_principal delegation_proxy,
@@ -82,7 +107,8 @@ static krb5plugin_windc_ftable windc = {
     windc_fini,
     pac_generate,
     pac_verify,
-    client_access
+    client_access,
+    pac_pk_generate
 };
 
 static const krb5plugin_windc_ftable *const windc_plugins[] = {
