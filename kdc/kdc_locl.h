@@ -87,6 +87,7 @@ struct kdc_request_desc {
     hdb_entry_ex *server;
 
     krb5_crypto armor_crypto;
+    krb5_pac armor_pac;
 
     KDCFastState fast;
 };
