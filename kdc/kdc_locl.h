@@ -81,6 +81,7 @@ struct astgs_request_desc {
     int validated_pa_type;
     krb5_enctype sessionetype;
     krb5_keyblock reply_key;
+    unsigned int reply_kvno;
     krb5_keyblock session_key;
 
     /* state */
