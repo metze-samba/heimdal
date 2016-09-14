@@ -386,6 +386,7 @@ pa_pkinit_validate(kdc_request_t r, const PA_DATA *pa)
 	_kdc_set_e_text(r, "Failed to build PK-INIT reply");
 	goto out;
     }
+    r->reply_kvno = 0;
 #if 0
     ret = _kdc_add_initial_verified_cas(r->context, r->config,
 					pkp, &r->et);
@@ -581,6 +582,8 @@ pa_enc_chal_validate(kdc_request_t r, const PA_DATA *pa)
 	if (ret)
 	    goto out;
 
+	r->reply_kvno = 0;
+
 	/*
 	 * Success
 	 */
@@ -735,6 +738,12 @@ pa_enc_ts_validate(kdc_request_t r, const PA_DATA *pa)
     ret = krb5_copy_keyblock_contents(r->context, &pa_key->key, &r->reply_key);
     if (ret)
 	return ret;
+
+    if (pa_key->mkvno != NULL) {
+	r->reply_kvno = *pa_key->mkvno;
+    } else {
+	r->reply_kvno = r->client->entry.kvno;
+    }
 
     ret = krb5_enctype_to_string(r->context, pa_key->key.keytype, &str);
     if (ret)
@@ -1994,6 +2003,8 @@ _kdc_as_rep(kdc_request_t r,
 	ret = krb5_copy_keyblock_contents(r->context, &ckey->key, &r->reply_key);
 	if (ret)
 	    goto out;
+
+	r->reply_kvno = 0;
     }
 
     if (r->clientdb->hdb_auth_status) {
@@ -2341,7 +2352,7 @@ _kdc_as_rep(kdc_request_t r,
     ret = _kdc_encode_reply(context, config,
 			    r->armor_crypto, req->req_body.nonce,
 			    &rep, &r->et, &r->ek, setype, r->server->entry.kvno,
-			    &skey->key, r->client->entry.kvno,
+			    &skey->key, r->reply_kvno,
 			    &r->reply_key, 0, &r->e_text, reply);
     if (ret)
 	goto out;
