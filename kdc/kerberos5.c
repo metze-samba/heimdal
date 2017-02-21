@@ -38,6 +38,43 @@
 #undef __attribute__
 #define __attribute__(X)
 
+struct kdc_pa_auth_state {
+	int auth_status;
+	const char *auth_details;
+	void *free_ptr;
+};
+
+static krb5_error_code
+_kdc_audit_auth_status(astgs_request_t r,
+		       int auth_status,
+		       const char *auth_details,
+		       const char *pa_type)
+{
+    krb5_context context = r->context;
+    krb5_kdc_configuration *config = r->config;
+    struct HDB *hdb = NULL;
+    int ret = 0;
+
+    if (r->clientdb != NULL) {
+	hdb = r->clientdb;
+    } else if (config->db[0]) {
+	hdb = config->db[0];
+    }
+
+    if (hdb != NULL && hdb->hdb_auth_status != NULL) {
+	ret = hdb->hdb_auth_status(context,
+				   hdb,
+				   r->client,
+				   r->addr,
+				   r->cname,
+				   auth_status,
+				   auth_details,
+				   pa_type);
+    }
+
+    return ret;
+}
+
 void
 _kdc_fix_time(time_t **t)
 {
@@ -403,7 +440,8 @@ _kdc_log_timestamp(astgs_request_t r, const char *type,
 #ifdef PKINIT
 
 static krb5_error_code
-pa_pkinit_validate(astgs_request_t r, const PA_DATA *pa)
+pa_pkinit_validate(astgs_request_t r, const PA_DATA *pa,
+		   struct kdc_pa_auth_state *auth_state)
 {
     pk_client_params *pkp = NULL;
     char *client_cert = NULL;
@@ -414,19 +452,22 @@ pa_pkinit_validate(astgs_request_t r, const PA_DATA *pa)
 	ret = KRB5KRB_AP_ERR_BAD_INTEGRITY;
 	_kdc_r_log(r, 4, "Failed to decode PKINIT PA-DATA -- %s",
 		   r->cname);
+	auth_state->auth_status = HDB_AUTH_PKINIT_FAILURE;
 	goto out;
     }
-    
+
     ret = _kdc_pk_check_client(r, pkp, &client_cert);
     if (ret) {
 	_kdc_set_e_text(r, "PKINIT certificate not allowed to "
 			"impersonate principal");
+	auth_state->auth_status = HDB_AUTH_PKINIT_FAILURE;
 	goto out;
     }
+    auth_state->auth_details = client_cert;
+    auth_state->free_ptr = client_cert;
 
     _kdc_r_log(r, 4, "PKINIT pre-authentication succeeded -- %s using %s",
 	       r->cname, client_cert);
-    free(client_cert);
 
     ret = _kdc_pk_mk_pa_reply(r, pkp);
     if (ret) {
@@ -438,6 +479,7 @@ pa_pkinit_validate(astgs_request_t r, const PA_DATA *pa)
     ret = _kdc_add_initial_verified_cas(r->context, r->config,
 					pkp, &r->et);
 #endif
+    auth_state->auth_status = HDB_AUTH_PKINIT_SUCCESS;
  out:
     if (pkp)
 	_kdc_pk_free_client_param(r->context, pkp);
@@ -500,7 +542,8 @@ make_pa_enc_challange(astgs_request_t r, krb5_crypto crypto)
 }
 
 static krb5_error_code
-pa_enc_chal_validate(astgs_request_t r, const PA_DATA *pa)
+pa_enc_chal_validate(astgs_request_t r, const PA_DATA *pa,
+		     struct kdc_pa_auth_state *auth_state)
 {
     krb5_data pepper1, pepper2, ts_data;
     int invalidPassword = 0;
@@ -518,14 +561,6 @@ pa_enc_chal_validate(astgs_request_t r, const PA_DATA *pa)
 	kdc_log(r->context, r->config, 4, "ENC-CHALL doesn't support anon");
 	return ret;
     }
-
-    if (r->client->entry.flags.locked_out) {
-       ret = KRB5KDC_ERR_CLIENT_REVOKED;
-       kdc_log(r->context, r->config, 0,
-               "Client (%s) is locked out", r->client_name);
-       return ret;
-    }
-
 
     ret = decode_EncryptedData(pa->padata_value.data,
 			       pa->padata_value.length,
@@ -619,6 +654,7 @@ pa_enc_chal_validate(astgs_request_t r, const PA_DATA *pa)
 		       (unsigned)labs(kdc_time - p.patimestamp),
 		       r->context->max_skew,
 		       r->cname);
+	    auth_state->auth_details = "AP_ERR_SKEW";
 
 	    free_PA_ENC_TS_ENC(&p);
 	    goto out;
@@ -642,16 +678,15 @@ pa_enc_chal_validate(astgs_request_t r, const PA_DATA *pa)
 	/*
 	 * Success
 	 */
-	if (r->clientdb->hdb_auth_status)
-	    r->clientdb->hdb_auth_status(r->context, r->clientdb, r->client,
-					 HDB_AUTH_SUCCESS);
+	auth_state->auth_status = HDB_AUTH_CORRECT_PASSWORD;
 	goto out;
     }
 
-    if (invalidPassword && r->clientdb->hdb_auth_status) {
-	r->clientdb->hdb_auth_status(r->context, r->clientdb, r->client,
-				     HDB_AUTH_WRONG_PASSWORD);
+    if (invalidPassword) {
+	auth_state->auth_status = HDB_AUTH_WRONG_PASSWORD;
 	ret = KRB5KDC_ERR_PREAUTH_FAILED;
+    } else {
+	ret = KRB5KDC_ERR_ETYPE_NOSUPP;
     }
  out:
     free_EncryptedData(&enc_data);
@@ -660,7 +695,8 @@ pa_enc_chal_validate(astgs_request_t r, const PA_DATA *pa)
 }
 
 static krb5_error_code
-pa_enc_ts_validate(astgs_request_t r, const PA_DATA *pa)
+pa_enc_ts_validate(astgs_request_t r, const PA_DATA *pa,
+		   struct kdc_pa_auth_state *auth_state)
 {
     EncryptedData enc_data;
     krb5_error_code ret;
@@ -670,13 +706,6 @@ pa_enc_ts_validate(astgs_request_t r, const PA_DATA *pa)
     size_t len;
     Key *pa_key;
     char *str;
-
-    if (r->client->entry.flags.locked_out) {
-	ret = KRB5KDC_ERR_CLIENT_REVOKED;
-	kdc_log(r->context, r->config, 0,
-		"Client (%s) is locked out", r->client_name);
-	return ret;
-    }
 
     ret = decode_EncryptedData(pa->padata_value.data,
 			       pa->padata_value.length,
@@ -743,7 +772,13 @@ pa_enc_ts_validate(astgs_request_t r, const PA_DATA *pa)
 		   "(enctype %s) error %s",
 		   r->cname, str ? str : "unknown enctype", msg);
 	krb5_free_error_message(r->context, msg);
-	free(str);
+
+	if (auth_state->free_ptr != NULL) {
+	    free(auth_state->free_ptr);
+	}
+	auth_state->auth_status = HDB_AUTH_WRONG_PASSWORD;
+	auth_state->auth_details = str ? str : "unknown enctype";
+	auth_state->free_ptr = str;
 
 	if(hdb_next_enctype2key(r->context, &r->client->entry, NULL,
 				enc_data.etype, &pa_key) == 0)
@@ -751,14 +786,16 @@ pa_enc_ts_validate(astgs_request_t r, const PA_DATA *pa)
 
 	free_EncryptedData(&enc_data);
 
-	if (r->clientdb->hdb_auth_status)
-	    r->clientdb->hdb_auth_status(r->context, r->clientdb, r->client,
-					 HDB_AUTH_WRONG_PASSWORD);
-
 	ret = KRB5KDC_ERR_PREAUTH_FAILED;
 	goto out;
     }
     free_EncryptedData(&enc_data);
+    if (auth_state->free_ptr != NULL) {
+	    free(auth_state->free_ptr);
+    }
+    *auth_state = (struct kdc_pa_auth_state) {
+	.auth_status = -1,
+    };
     ret = decode_PA_ENC_TS_ENC(ts_data.data,
 			       ts_data.length,
 			       &p,
@@ -783,6 +820,7 @@ pa_enc_ts_validate(astgs_request_t r, const PA_DATA *pa)
 		   (unsigned)labs(kdc_time - p.patimestamp),
 		   r->context->max_skew,
 		   r->cname);
+	auth_state->auth_details = "AP_ERR_SKEW";
 
 	/*
 	 * The following is needed to make windows clients to
@@ -814,7 +852,9 @@ pa_enc_ts_validate(astgs_request_t r, const PA_DATA *pa)
 	       r->cname, str ? str : "unknown enctype");
     _kdc_audit_addkv((kdc_request_t)r, 0, "pa-etype", "%d",
 		     (int)pa_key->key.keytype);
-    free(str);
+    auth_state->auth_status = HDB_AUTH_CORRECT_PASSWORD;
+    auth_state->auth_details = str ? str : "unknown enctype";
+    auth_state->free_ptr = str;
 
     ret = 0;
 
@@ -829,7 +869,8 @@ struct kdc_patypes {
     unsigned int flags;
 #define PA_ANNOUNCE	1
 #define PA_REQ_FAST	2 /* only use inside fast */
-    krb5_error_code (*validate)(astgs_request_t, const PA_DATA *pa);
+    krb5_error_code (*validate)(astgs_request_t, const PA_DATA *pa,
+				struct kdc_pa_auth_state *auth_state);
 };
 
 static const struct kdc_patypes pat[] = {
@@ -1919,6 +1960,14 @@ _kdc_as_rep(astgs_request_t r)
 	kdc_log(context, config, 4, "UNKNOWN -- %s: %s", r->cname, msg);
 	krb5_free_error_message(context, msg);
 	ret = KRB5KDC_ERR_C_PRINCIPAL_UNKNOWN;
+	_kdc_audit_auth_status(r, HDB_AUTH_CLIENT_UNKNOWN, NULL, NULL);
+	goto out;
+    }
+    if (r->client->entry.flags.locked_out) {
+	ret = KRB5KDC_ERR_CLIENT_REVOKED;
+	kdc_log(r->context, r->config, 0,
+		"Client (%s) is locked out", r->cname);
+	_kdc_audit_auth_status(r, HDB_AUTH_CLIENT_LOCKED_OUT, NULL, NULL);
 	goto out;
     }
     ret = _kdc_db_fetch(context, config, r->server_princ,
@@ -1983,13 +2032,28 @@ _kdc_as_rep(astgs_request_t r)
 	    i = 0;
 	    pa = _kdc_find_padata(req, &i, pat[n].type);
 	    if (pa) {
+		struct kdc_pa_auth_state auth_state = {
+			.auth_status = -1,
+		};
+
                 _kdc_audit_addkv((kdc_request_t)r, KDC_AUDIT_VIS, "pa", "%s",
                                  pat[n].name);
-		ret = pat[n].validate(r, pa);
+		ret = pat[n].validate(r, pa, &auth_state);
 		if (ret != 0) {
 		    krb5_error_code  ret2;
 		    Key *ckey = NULL;
 		    krb5_boolean default_salt;
+
+		    if (auth_state.auth_status == -1) {
+			auth_state.auth_status = HDB_AUTH_GENERIC_FAILURE;
+		    }
+		    _kdc_audit_auth_status(r,
+					   auth_state.auth_status,
+					   auth_state.auth_details,
+					   pat[n].name);
+		    if (auth_state.free_ptr != NULL) {
+			free(auth_state.free_ptr);
+		    }
 
 		    /*
 		     * If there is a client key, send ETYPE_INFO{,2}
@@ -2008,6 +2072,16 @@ _kdc_as_rep(astgs_request_t r)
 		kdc_log(context, config, 4,
 			"%s pre-authentication succeeded -- %s",
 			pat[n].name, r->cname);
+		if (auth_state.auth_status == -1) {
+			auth_state.auth_status = HDB_AUTH_GENERIC_SUCCESS;
+		}
+		_kdc_audit_auth_status(r,
+				       auth_state.auth_status,
+				       auth_state.auth_details,
+				       pat[n].name);
+		if (auth_state.free_ptr != NULL) {
+		    free(auth_state.free_ptr);
+		}
 		found_pa = 1;
 		r->et.flags.pre_authent = 1;
 		r->validated_pa_type = pat[n].type;
@@ -2065,11 +2139,6 @@ _kdc_as_rep(astgs_request_t r)
 	r->reply_kvno = 0;
     }
 
-    if (r->clientdb->hdb_auth_status) {
-	r->clientdb->hdb_auth_status(context, r->clientdb, r->client,
-				     HDB_AUTH_SUCCESS);
-    }
-
     /*
      * Verify flags after the user been required to prove its identity
      * with in a preauth mech.
@@ -2088,6 +2157,8 @@ _kdc_as_rep(astgs_request_t r)
 
 	r->et.flags.anonymous = 1;
     }
+
+    _kdc_audit_auth_status(r, HDB_AUTHZ_SUCCESS, NULL, NULL);
 
     /*
      * Select the best encryption type for the KDC with out regard to
