@@ -432,6 +432,7 @@ process_request(krb5_context context,
     r->context = context;
     r->config = config;
     r->from = from;
+    r->addr = addr;
     r->request.data = buf;
     r->request.length = len;
     r->datagram_reply = datagram_reply;
