@@ -220,7 +220,8 @@ krb5_decrypt_ticket(krb5_context context,
 	    return KRB5KRB_AP_ERR_TKT_EXPIRED;
 	}
 
-	if(!t.flags.transited_policy_checked) {
+	if(!t.flags.transited_policy_checked
+	   && !(flags & KRB5_VERIFY_AP_REQ_NO_TRANSITED_CHECK)) {
 	    ret = check_transited(context, ticket, &t);
 	    if(ret) {
 		free_EncTicketPart(&t);
