@@ -16,7 +16,7 @@ popd
 
 try_patch() {
     commit="$1"
-    git format-patch --stdout $commit -1 > "$commit".patch
+    git format-patch --stdout $commit -1 source4/heimdal > "$commit".patch
     sed -i 's|/source4/heimdal/|/|g' "$commit".patch
     sed -i "s|^---$|(cherry picked from Samba commit $commit)\n---|g" "$commit".patch
     pushd $LORIKEET_PATH || exit 1
