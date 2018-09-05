@@ -263,8 +263,11 @@ typedef struct HDB {
      * In case the entry is locked out, the backend should set the
      * hdb_entry.flags.locked-out flag.
      */
-    krb5_error_code (*hdb_auth_status)(krb5_context, struct HDB *,
-				       hdb_entry_ex *, struct sockaddr *from_addr,
+    krb5_error_code (*hdb_auth_status)(krb5_context,
+				       struct HDB *,
+				       hdb_entry_ex *,
+				       const struct timeval *start_time,
+				       const struct sockaddr *from_addr,
 				       const char *original_client_name,
 				       int auth_type,
 				       const char *auth_details,
