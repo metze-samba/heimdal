@@ -14,6 +14,38 @@ git reset --hard
 git am --abort
 popd
 
+# From https://gist.github.com/kfish/7425248
+
+apply () {
+  filename=$1
+  shift
+  patch_args=$*
+
+  gotSubject=no
+  msg=""
+
+  cat $filename | while read line; do
+    if [ "$line" == "---" ]; then
+
+      patch $patch_args -p1 < $filename
+      git commit -a -m 'CHECK AUTHOR' -m "$msg"
+
+      break
+    fi
+    if [ "$gotSubject" == "no" ]; then
+      hdr=(${line//:/ })
+      if [ "${hdr[0]}" == "Subject" ]; then
+        gotSubject=yes
+        msg="${hdr[@]:3}"
+      fi
+    else
+      msg="$msg $line"
+    fi
+    msg="$msg
+"
+  done
+}
+
 try_patch() {
     commit="$1"
     git format-patch --stdout $commit -1 source4/heimdal > "$commit".patch
@@ -26,12 +58,13 @@ try_patch() {
 	echo
 	echo "Commit $commit can apply - applying"
 	git reset --hard
-	git am "$S4PATH/$commit.patch"
+	git am "$S4PATH/$commit.patch" || apply "$S4PATH/$commit.patch"
     else
 	echo
 	echo "Commit $commit does not apply cleanly"
 	echo
     fi
+    git am --abort
     popd || exit 1
 }
 
