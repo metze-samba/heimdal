@@ -120,7 +120,7 @@ samba_create() {
 		echo "add changed files to the index"
 		git add -u source4/heimdal
 		echo "commit the changed files blindly"
-		git commit -m "s4:heimdal: import $lorikeet_branch (commit $lorikeet_commit)"
+		git commit --no-verify -m "s4:heimdal: import $lorikeet_branch (commit $lorikeet_commit)"
 		echo "cleanup source4/heimdal"
 		rm -rf source4/heimdal
 		git checkout source4/heimdal
