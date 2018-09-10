@@ -50,7 +50,7 @@ samba_init() {
 		mkdir samba || bailout $?
 		pushd samba
 		git init || bailout $?
-		git remote add origin git://git.samba.org/samba.git
+		git remote add origin https://git.samba.org/samba.git
 		git remote add local-heimdal ../heimdal
 		popd
 	}

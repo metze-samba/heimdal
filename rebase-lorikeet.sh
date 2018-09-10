@@ -40,9 +40,9 @@ heimdal_init() {
 		mkdir heimdal || bailout $?
 		pushd heimdal
 		git init || bailout $?
-		git remote add heimdal-git git://github.com/heimdal/heimdal.git
+		git remote add heimdal-git https://github.com/heimdal/heimdal.git
 		git remote add lorikeet-heimdal-abartlet ssh://git.samba.org/data/git/abartlet/lorikeet-heimdal.git/.git
-		git remote add lorikeet-heimdal ssh://git.samba.org/lorikeet-heimdal.git
+		git remote add lorikeet-heimdal https://gitlab.com/samba-team/devel/lorikeet-heimdal
 		git remote add ${heimdal_my_wip_name} ${heimdal_my_wip_url}
 		popd
 	}
