@@ -104,7 +104,6 @@ typedef Checksum krb5_checksum;
 typedef ENCTYPE krb5_enctype;
 
 typedef struct krb5_get_init_creds_ctx *krb5_init_creds_context;
-typedef struct _krb5_tkt_creds_context *krb5_tkt_creds_context;
 
 typedef heim_octet_string krb5_data;
 
