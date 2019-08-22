@@ -130,6 +130,9 @@ extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_krb5_import_rfc4121_context_x_oid_
 extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_krb5_cred_no_transit_check_x_oid_desc;
 #define GSS_KRB5_CRED_NO_TRANSIT_CHECK_X (&__gss_krb5_cred_no_transit_check_x_oid_desc)
 
+extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_krb5_cred_iterate_acceptor_keytab_x_oid_desc;
+#define GSS_KRB5_CRED_ITERATE_ACCEPTOR_KEYTAB_X (&__gss_krb5_cred_iterate_acceptor_keytab_x_oid_desc)
+
  /* glue for gss_inquire_saslname_for_mech */
 extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_c_ma_sasl_mech_name_oid_desc;
 #define GSS_C_MA_SASL_MECH_NAME (&__gss_c_ma_sasl_mech_name_oid_desc)
