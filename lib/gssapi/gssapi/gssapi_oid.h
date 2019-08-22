@@ -99,6 +99,9 @@ extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_krb5_cred_no_ci_flags_x_oid_desc;
 extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_krb5_cred_no_transit_check_x_oid_desc;
 #define GSS_KRB5_CRED_NO_TRANSIT_CHECK_X (&__gss_krb5_cred_no_transit_check_x_oid_desc)
 
+extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_krb5_cred_iterate_acceptor_keytab_x_oid_desc;
+#define GSS_KRB5_CRED_ITERATE_ACCEPTOR_KEYTAB_X (&__gss_krb5_cred_iterate_acceptor_keytab_x_oid_desc)
+
 extern GSSAPI_LIB_VARIABLE gss_OID_desc __gss_krb5_import_cred_x_oid_desc;
 #define GSS_KRB5_IMPORT_CRED_X (&__gss_krb5_import_cred_x_oid_desc)
 
