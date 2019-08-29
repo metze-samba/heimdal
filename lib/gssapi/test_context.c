@@ -156,6 +156,8 @@ oid_to_string(const gss_OID oid)
     return "unknown oid";
 }
 
+static gss_cred_id_t acceptor_cred = GSS_C_NO_CREDENTIAL;
+
 static void
 loop(gss_OID mechoid,
      gss_OID nameoid, const char *target,
@@ -249,7 +251,7 @@ loop(gss_OID mechoid,
 
 	maj_stat = gss_accept_sec_context(&min_stat,
 					  sctx,
-					  GSS_C_NO_CREDENTIAL,
+					  acceptor_cred,
 					  &output_token,
 					  channel_bindings_p,
 					  &src_name,
