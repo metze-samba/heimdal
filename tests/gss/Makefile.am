@@ -2,7 +2,7 @@
 
 include $(top_srcdir)/Makefile.am.common
 
-noinst_DATA = krb5.conf
+noinst_DATA = krb5.conf krb5.conf.kdc
 
 SCRIPT_TESTS = check-basic check-gss check-gssmask check-context check-spnego check-ntlm
 
@@ -53,6 +53,10 @@ krb5.conf: krb5.conf.in Makefile
 	$(do_subst) < $(srcdir)/krb5.conf.in > krb5.conf.tmp && \
 	mv krb5.conf.tmp krb5.conf
 
+krb5.conf.kdc: krb5.conf.kdc.in Makefile
+	$(do_subst) < $(srcdir)/krb5.conf.kdc.in > krb5.conf.kdc.tmp && \
+	mv krb5.conf.kdc.tmp krb5.conf.kdc
+
 CLEANFILES= \
 	$(TESTS) \
 	foopassword \
@@ -61,6 +65,7 @@ CLEANFILES= \
 	krb5ccfile-ds \
 	server.keytab \
 	krb5.conf \
+	krb5.conf.kdc \
 	current-db* \
 	*.log \
 	tempfile \
