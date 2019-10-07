@@ -263,6 +263,18 @@ ${context} --gsskrb5-acceptor-identity=${keytabfile} \
 		echo "ERROR: Missing 'no transit allowed' error";
 		eval "$testfailed";
 	}
+> messages.log
+echo "======test cross realm without transit check (--acceptor-no-transit-check; $keytabfile)"
+${context} --gsskrb5-acceptor-identity=$keytabfile --acceptor-no-transit-check \
+	host@srv.test4.h5l.se > test_context.log 2>&1 || {
+		cat test_context.log;
+		eval "$testfailed";
+	}
+	cat test_context.log
+	grep -q "${NO_TRANSIT_ALLOWED_ERROR}" test_context.log && {
+		echo "ERROR: Found 'no transit allowed' error";
+		eval "$testfailed";
+	}
 
 echo "======test context building"
 for mech in krb5 krb5iov spnego spnegoiov; do
