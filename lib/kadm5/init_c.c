@@ -288,17 +288,15 @@ get_cache_principal(krb5_context context,
 
     {
 	krb5_creds in, *out;
-	krb5_kdc_flags flags;
 
-	flags.i = 0;
 	memset(&in, 0, sizeof(in));
 
 	in.client = p1;
 	in.server = p2;
 
 	/* check for initial ticket kadmin/admin */
-	ret = krb5_get_credentials_with_flags(context, KRB5_GC_CACHED, flags,
-					      *id, &in, &out);
+	ret = krb5_get_credentials(context, KRB5_GC_CACHED,
+				   *id, &in, &out);
 	krb5_free_principal(context, p2);
 	if (ret == 0) {
 	    if (out->flags.b.initial) {
