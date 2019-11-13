@@ -39,6 +39,8 @@ db_type=@db_type@
 
 . ${env_setup}
 
+echo "METZE"
+exit 77
 # If there is no useful db support compiled in, disable test
 ${have_db} || exit 77
 
