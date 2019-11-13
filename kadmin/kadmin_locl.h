@@ -100,7 +100,7 @@ extern krb5_context context;
 extern void * kadm_handle;
 
 #undef ALLOC
-#define ALLOC(X) ((X) = malloc(sizeof(*(X))))
+#define ALLOC(X) ((X) = calloc(1, sizeof(*(X))))
 
 /* util.c */
 
