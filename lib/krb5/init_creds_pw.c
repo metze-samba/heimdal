@@ -1844,12 +1844,116 @@ fast_unwrap_as_rep(krb5_context context, int32_t nonce,
 }
 
 static krb5_error_code
-fast_unwrap_error(krb5_context context, struct fast_state *state, KRB_ERROR *error)
+fast_unwrap_error(krb5_context context, int32_t nonce, struct fast_state *state, KRB_ERROR *error)
 {
-    if (state->armor_crypto == NULL)
-	return check_fast(context, state);
+    PA_FX_FAST_REPLY fxfastrep;
+    KrbFastResponse fastrep;
+    krb5_error_code ret;
+    PA_DATA *pa = NULL;
+    int idx = 0;
+    METHOD_DATA md = {0};
 
-    return 0;
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    if (state->armor_crypto == NULL) {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	return check_fast(context, state);
+    }
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	if (error->e_data) {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	    ret = decode_METHOD_DATA(error->e_data->data,
+				     error->e_data->length,
+				     &md,
+				     NULL);
+	    if (ret) {
+		return check_fast(context, state);
+	    }
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	} else {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+		return check_fast(context, state);
+	}
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    pa = krb5_find_padata(md.val, md.len,
+			  KRB5_PADATA_FX_FAST, &idx);
+    if (pa == NULL) {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	return check_fast(context, state);
+    }
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    memset(&fxfastrep, 0, sizeof(fxfastrep));
+    memset(&fastrep, 0, sizeof(fastrep));
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    ret = decode_PA_FX_FAST_REPLY(pa->padata_value.data, pa->padata_value.length, &fxfastrep, NULL);
+    if (ret)
+	return ret;
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    if (fxfastrep.element == choice_PA_FX_FAST_REPLY_armored_data) {
+	size_t size;
+	krb5_data data;
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	ret = krb5_decrypt_EncryptedData(context,
+					 state->armor_crypto,
+					 KRB5_KU_FAST_REP,
+					 &fxfastrep.u.armored_data.enc_fast_rep,
+					 &data);
+	if (ret)
+	    goto out;
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	ret = decode_KrbFastResponse(data.data, data.length, &fastrep, NULL);
+	krb5_data_free(&data);
+	if (ret)
+	    goto out;
+
+	_krb5_debug(context, 0, "%s(%d): ", __func__, __LINE__);
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	ASN1_MALLOC_ENCODE(METHOD_DATA, error->e_data->data, error->e_data->length, &fastrep.padata, &size, ret);
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	if (ret)
+	    goto out;
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	heim_assert(error->e_data->length == size, "ASN.1 internal error");
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+
+    } else {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	return check_fast(context, state);
+    }
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    if (nonce != fastrep.nonce) {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	ret = KRB5KDC_ERR_PREAUTH_FAILED;
+	goto out;
+    }
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    free_METHOD_DATA(&md);
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+
+    if (fastrep.strengthen_key) {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	return check_fast(context, state);
+    }
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    if (fastrep.finished) {
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+	return check_fast(context, state);
+    }
+
+ out:
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    free_PA_FX_FAST_REPLY(&fxfastrep);
+
+    _krb5_debug(context, 0, "%s(%d): fast_unwrap_error", __func__, __LINE__);
+    return ret;
 }
 
 krb5_error_code
@@ -2032,8 +2136,11 @@ fast_wrap_req(krb5_context context, struct fast_state *state, KDC_REQ *req)
     krb5_data data;
     size_t size;
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
+
     if (state->flags & KRB5_FAST_DISABLED) {
 	_krb5_debug(context, 10, "fast disabled, not doing any fast wrapping");
+	_krb5_debug(context, 0, "fast disabled, not doing any fast wrapping");
 	return 0;
     }
 
@@ -2041,8 +2148,10 @@ fast_wrap_req(krb5_context context, struct fast_state *state, KDC_REQ *req)
     memset(&fastreq, 0, sizeof(fastreq));
     krb5_data_zero(&data);
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
     if (state->armor_crypto == NULL) {
 	if (state->armor_ccache) {
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
 	    /*
 	     * Instead of keeping state in FX_COOKIE in the KDC, we
 	     * rebuild a new armor key for every request, because this
@@ -2083,16 +2192,26 @@ fast_wrap_req(krb5_context context, struct fast_state *state, KDC_REQ *req)
     if (ret)
         goto out;
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
     if (req->padata) {
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
+    _krb5_debug(context, 0, "%s(%d): req->padata->len[%u]", __func__, __LINE__,
+		(unsigned)req->padata->len);
 	ret = copy_METHOD_DATA(req->padata, &fastreq.padata);
 	free_METHOD_DATA(req->padata);
     } else {
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
 	if ((ALLOC(req->padata, 1)) == NULL)
             ret = krb5_enomem(context);
     }
     if (ret)
         goto out;
+    _krb5_debug(context, 0, "%s(%d): req->padata->len[%u]", __func__, __LINE__,
+		(unsigned)req->padata->len);
+    _krb5_debug(context, 0, "%s(%d): fastreq.padata.len[%u]", __func__, __LINE__,
+		(unsigned)fastreq.padata.len);
 
+    _krb5_debug(context, 0, "%s(%d): ", __func__, __LINE__);
     ASN1_MALLOC_ENCODE(KrbFastReq, data.data, data.length, &fastreq, &size, ret);
     if (ret)
 	goto out;
@@ -2100,10 +2219,12 @@ fast_wrap_req(krb5_context context, struct fast_state *state, KDC_REQ *req)
 
     fxreq.element = state->type;
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
     if (state->type == choice_PA_FX_FAST_REQUEST_armored_data) {
 	size_t len;
 	void *buf;
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
 	ret = make_fast_ap_fxarmor(context, state, fastreq.req_body.realm, &fxreq.u.armored_data.armor);
 	if (ret)
 	    goto out;
@@ -2138,17 +2259,20 @@ fast_wrap_req(krb5_context context, struct fast_state *state, KDC_REQ *req)
 	heim_assert(false, "unknown FAST type, internal error");
     }
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
     ASN1_MALLOC_ENCODE(PA_FX_FAST_REQUEST, data.data, data.length, &fxreq, &size, ret);
     if (ret)
 	goto out;
     heim_assert(data.length == size, "ASN.1 internal error");
 
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
     ret = krb5_padata_add(context, req->padata, KRB5_PADATA_FX_FAST, data.data, data.length);
     if (ret)
 	goto out;
     krb5_data_zero(&data);
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
  out:
     free_PA_FX_FAST_REQUEST(&fxreq);
     free_KrbFastReq(&fastreq);
@@ -2158,6 +2282,7 @@ fast_wrap_req(krb5_context context, struct fast_state *state, KDC_REQ *req)
     }
     krb5_data_free(&data);
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
     return ret;
 }
 
@@ -2332,7 +2457,7 @@ krb5_init_creds_step(krb5_context context,
 	    /*
 	     * Unwrap KRB-ERROR
 	     */
-	    ret = fast_unwrap_error(context, &ctx->fast_state, &ctx->error);
+	    ret = fast_unwrap_error(context, ctx->nonce, &ctx->fast_state, &ctx->error);
 	    if (ret)
 		goto out;
 
@@ -2474,7 +2599,14 @@ krb5_init_creds_step(krb5_context context,
 	}
     }
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
+    _krb5_debug(context, 0, "%s(%d): ctx->md.[%u]", __func__, __LINE__,
+		(unsigned)ctx->md.len);
     if (ctx->as_req.padata) {
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
+    _krb5_debug(context, 0, "%s(%d): ctx->as_req.padata->len[%u]", __func__, __LINE__,
+		(unsigned)ctx->as_req.padata->len);
 	free_METHOD_DATA(ctx->as_req.padata);
 	free(ctx->as_req.padata);
 	ctx->as_req.padata = NULL;
@@ -2490,6 +2622,9 @@ krb5_init_creds_step(krb5_context context,
     if (ret)
 	goto out;
 
+    _krb5_debug(context, 0, "%s(%d): METZE", __func__, __LINE__);
+    _krb5_debug(context, 0, "%s(%d): ctx->as_req.padata->len[%u]", __func__, __LINE__,
+		(unsigned)ctx->as_req.padata->len);
     /*
      * Wrap with FAST
      */
