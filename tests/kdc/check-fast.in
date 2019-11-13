@@ -63,10 +63,15 @@ aklist="${klist} -c $acache"
 kgetcred="${kgetcred} -c $cache"
 kdestroy="${kdestroy} -c $cache ${afs_no_unlog}"
 
-rm -f ${keytabfile}
+keytabfile="keytabfile"
+keytab="FILE:${keytabfile}"
+
+rm -f cache.krb5*
+rm -f acache.krb5*
 rm -f current-db*
 rm -f out-*
 rm -f mkey.file*
+rm -f ${keytabfile}
 
 > messages.log
 
@@ -77,8 +82,11 @@ ${kadmin} \
     --realm-max-renewable-life=1month \
     ${R} || exit 1
 
+${kadmin} ext -k ${keytab} krbtgt/${R}@${R} || exit 1
 ${kadmin} add -p foo --use-defaults foo@${R} || exit 1
+${kadmin} ext -k ${keytab} foo@${R} || exit 1
 ${kadmin} add -p foo --use-defaults ${server}@${R} || exit 1
+${kadmin} ext -k ${keytab} ${server}@${R} || exit 1
 
 echo "Doing database check"
 ${kadmin} check ${R} || exit 1
@@ -114,6 +122,7 @@ echo "Acquire host ticket to be used as an ARMOR ticket"; > messages.log
 ${akinit} --password-file=${objdir}/foopassword ${server}@${R} >/dev/null|| { exit 1; }
 echo "Checking for FAST avail (in the FAST armor cache)"; > messages.log
 ${aklist} --hidden | grep fast_avail > /dev/null || { exit 1; }
+${aklist} --hidden
 
 #
 # Client tests
